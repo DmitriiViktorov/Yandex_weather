@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Выбор города</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 50px;
+            min-height: 100vh;
+        }
+        .container {
+            background: #ffffff;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 800px;
+        }
+        h1 {
+            font-size: 1.4rem;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        form {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 0.6rem;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        button {
+            width: 160px;
+            height: 40px;
+            border: none;
+            border-radius: 6px;
+            background-color: #4aa3df;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3b91c7;
+        }
+        .city-option {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 0.7rem;
+            margin-top: 0.6rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .city-text {
+            flex: 1;
+            margin-right: 1rem;
+            word-wrap: break-word;
+        }
+        .back-link {
+            display: block;
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Возможные варианты для города</h1>
+
+    <form id="search-form">
+        <input type="text" id="city-input" placeholder="Введите город" required>
+        <button type="submit">Найти</button>
+    </form>
+
+    <div id="cities-container"></div>
+
+    <div class="back-link">
+        <a href="/">← Вернуться на главную</a>
+    </div>
+</div>
+
+<script>
+async function searchCity(city) {
+    const formData = new FormData();
+    formData.append("city", city);
+
+    const res = await fetch("/api/search_city", { method: "POST", body: formData });
+    const data = await res.json();
+
+    const container = document.getElementById("cities-container");
+    container.innerHTML = "";
+
+    if (res.ok) {
+        data.results.forEach(c => {
+            const div = document.createElement("div");
+            div.className = "city-option";
+
+            div.innerHTML = `
+                <span class="city-text">${c.address}</span>
+                <form action="/api/weather_data" method="post">
+                    <input type="hidden" name="address" value="${c.address}">
+                    <input type="hidden" name="lat" value="${c.lat}">
+                    <input type="hidden" name="lon" value="${c.lon}">
+                    <button type="submit">Скачать отчёт</button>
+                </form>
+            `;
+            container.appendChild(div);
+        });
+    } else {
+        container.innerHTML = `<p style="color:red;">${data.error || "Город не найден"}</p>`;
+    }
+}
+
+document.getElementById("search-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const city = document.getElementById("city-input").value;
+    searchCity(city);
+});
+
+const urlParams = new URLSearchParams(window.location.search);
+const initialCity = urlParams.get("city");
+if (initialCity) {
+    document.getElementById("city-input").value = initialCity;
+    searchCity(initialCity);
+}
+</script>
+
+</body>
+</html>

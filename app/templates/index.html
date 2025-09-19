@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Генератор отчётов о погоде</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background: #ffffff;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 800px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+        p {
+            font-size: 0.95rem;
+            color: #555;
+            margin-bottom: 1.5rem;
+        }
+        input[type="text"] {
+            width: 80%;
+            padding: 0.6rem;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        button {
+            margin-top: 1rem;
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 6px;
+            background-color: #4aa3df;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3b91c7;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Генератор отчётов о погоде</h1>
+    <p>Введите название города, чтобы получить прогноз<br>и скачать его в Excel.</p>
+
+    <form action="/choose" method="get">
+        <input type="text" name="city" placeholder="Введите город" required>
+        <br>
+        <button type="submit">Найти</button>
+    </form>
+</div>
+</body>
+</html>
