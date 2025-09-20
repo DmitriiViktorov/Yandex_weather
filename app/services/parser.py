@@ -12,8 +12,7 @@ class WeatherParser:
     Отвечает только за извлечение и первичную обработку HTML данных.
     """
 
-    def __init__(self, address: str, latitude: float, longitude: float):
-        self.address = address
+    def __init__(self, latitude: float, longitude: float):
         self.latitude = latitude
         self.longitude = longitude
 

@@ -108,7 +108,6 @@ async function searchCity(city) {
             div.innerHTML = `
                 <span class="city-text">${c.address}</span>
                 <form action="/api/weather_data" method="post">
-                    <input type="hidden" name="address" value="${c.address}">
                     <input type="hidden" name="lat" value="${c.lat}">
                     <input type="hidden" name="lon" value="${c.lon}">
                     <input type="hidden" name="user_city" value="${city}">
