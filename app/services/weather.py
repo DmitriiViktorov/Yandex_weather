@@ -1,7 +1,4 @@
-
-MAX_PRESSURE_DIFF = 5
-PRESSURE_WARNINGS_RAISE = "Ожидается резкое увеличение атмосферного давления"
-PRESSURE_WARNINGS_FALL = "Ожидается резкое падение атмосферного давления"
+from app.core.conf import settings
 
 
 class WeatherAnalyzer:
@@ -18,6 +15,9 @@ class WeatherAnalyzer:
             for p in day_periods
             if periods_info.get(p) and periods_info[p]["temp"] is not None
         ]
+
+        if not temps:
+            raise ValueError("Отсутствуют данные о температуре для расчета среднего значения")
 
         return round(sum(temps) / len(temps), 1) if temps else None
 
@@ -41,16 +41,16 @@ class WeatherAnalyzer:
         max_pressure, min_pressure = max(pressures), min(pressures)
         pressure_diff = max_pressure - min_pressure
 
-        if pressure_diff < MAX_PRESSURE_DIFF:
+        if pressure_diff < settings.max_pressure_diff:
             return None
 
         max_index = pressures.index(max_pressure)
         min_index = pressures.index(min_pressure)
 
         if max_index < min_index:
-            return PRESSURE_WARNINGS_FALL
+            return settings.pressure_warning_fall
         elif max_index > min_index:
-            return PRESSURE_WARNINGS_RAISE
+            return settings.pressure_warning_raise
         else:
             return None
 
@@ -59,10 +59,17 @@ class WeatherAnalyzer:
         Анализирует сырые данные о погоде и возвращает обработанную информацию
         с расчетами и предупреждениями.
         """
+        if not raw_data:
+            raise ValueError("Получены пустые данные для анализа")
+
         result = {}
 
         for date, day_data in raw_data.items():
             periods_info = day_data["periods_info"]
+
+            if not periods_info:
+                raise ValueError(f"Отсутствуют данные о периодах дня для {date}")
+
             mag_field = day_data.get("mag_field")
 
             avg_temp = self._calculate_average_temp(periods_info)

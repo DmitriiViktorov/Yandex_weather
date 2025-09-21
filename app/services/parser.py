@@ -1,9 +1,22 @@
 import requests
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
+from requests.exceptions import RequestException, Timeout, ConnectionError
+
+from app.core.conf import settings
 
 
-DAYS_LENGTH = 7
+class WeatherParsingError(Exception):
+    """Базовое исключение для ошибок парсинга погоды"""
+    pass
+
+class WeatherDataNotFoundError(WeatherParsingError):
+    """Исключение когда не найдены данные о погоде на странице"""
+    pass
+
+class WeatherServiceUnavailableError(WeatherParsingError):
+    """Исключение когда сервис погоды недоступен"""
+    pass
 
 
 class WeatherParser:
@@ -18,9 +31,8 @@ class WeatherParser:
 
     def _city_weather_url(self) -> str:
         """Формирует URL для запроса погоды по координатам."""
-        base_url = "https://yandex.ru/pogoda/ru?"
         coordinates = f"lat={self.latitude}&lon={self.longitude}"
-        return base_url + coordinates
+        return settings.base_url + coordinates
 
     def _parse_temp(self, temp_str: str) -> int | None:
         """
@@ -56,10 +68,24 @@ class WeatherParser:
         Парсит данные о погоде с сайта и возвращает структурированные данные.
         """
         weather_url = self._city_weather_url()
-        html_page = requests.get(weather_url)
+        try:
+            html_page = requests.get(
+                weather_url,
+                timeout=settings.timeout,
+            )
+            html_page.raise_for_status()
+        except Timeout:
+            raise WeatherServiceUnavailableError(f"Таймаут при запросе к {weather_url}")
+        except ConnectionError:
+            raise WeatherServiceUnavailableError("Не удалось подключиться к сервису погоды")
+        except RequestException as e:
+            raise WeatherServiceUnavailableError(f"Ошибка запроса к сервису погоды: {str(e)}")
 
         soup = BeautifulSoup(html_page.content, "html.parser")
-        weather_data = soup.select("article[class^='AppForecastDay']")[:DAYS_LENGTH]
+        weather_data = soup.select("article[class^='AppForecastDay']")[:settings.days_length]
+
+        if not weather_data:
+            raise WeatherDataNotFoundError("На странице не найдены данные о прогнозе погоды")
 
         day_parts = {"m": "Утро", "d": "День", "e": "Вечер", "n": "Ночь"}
 
@@ -70,22 +96,24 @@ class WeatherParser:
             date = str(today + timedelta(days=i))
 
             result[date] = {"periods_info": {}}
+            try:
+                for part in day_parts.keys():
+                    temp = day_info.find("div", style=lambda s: s and f"grid-area:{part}-temp" in s)
+                    text = day_info.find("div", style=lambda s: s and f"grid-area:{part}-text" in s)
+                    hum = day_info.find("div", style=lambda s: s and f"grid-area:{part}-hum" in s)
+                    press = day_info.find("div", style=lambda s: s and f"grid-area:{part}-press" in s)
 
-            for part in day_parts.keys():
-                temp = day_info.find("div", style=lambda s: s and f"grid-area:{part}-temp" in s)
-                text = day_info.find("div", style=lambda s: s and f"grid-area:{part}-text" in s)
-                hum = day_info.find("div", style=lambda s: s and f"grid-area:{part}-hum" in s)
-                press = day_info.find("div", style=lambda s: s and f"grid-area:{part}-press" in s)
+                    temp_int = self._parse_temp(temp.get_text(strip=True) if temp else None)
 
-                temp_int = self._parse_temp(temp.get_text(strip=True) if temp else None)
-
-                result[date]["periods_info"][day_parts[part]] = {
-                    "temp": temp_int,
-                    "text": text.get_text(strip=True) if text else None,
-                    "humidity": hum.get_text(strip=True) if hum else None,
-                    "pressure": int(press.get_text(strip=True)) if press and press.get_text(
-                        strip=True).isdigit() else None,
-                }
+                    result[date]["periods_info"][day_parts[part]] = {
+                        "temp": temp_int,
+                        "text": text.get_text(strip=True) if text else None,
+                        "humidity": hum.get_text(strip=True) if hum else None,
+                        "pressure": int(press.get_text(strip=True)) if press and press.get_text(
+                            strip=True).isdigit() else None,
+                    }
+            except Exception as e:
+                raise WeatherParsingError(f"Не удалось распарсить данные для даты {date}: {str(e)}")
 
         mag_field = self._extract_magnetic_field(soup)
 

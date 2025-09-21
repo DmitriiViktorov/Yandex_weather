@@ -15,24 +15,28 @@
             padding-top: 50px;
             min-height: 100vh;
         }
+
         .container {
             background: #ffffff;
             padding: 2rem;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             width: 800px;
         }
+
         h1 {
             font-size: 1.4rem;
             color: #2c3e50;
             margin-bottom: 1rem;
             text-align: center;
         }
+
         form {
             display: flex;
             gap: 1rem;
             margin-bottom: 1.5rem;
         }
+
         input[type="text"] {
             flex: 1;
             padding: 0.6rem;
@@ -40,6 +44,7 @@
             border-radius: 6px;
             font-size: 1rem;
         }
+
         button {
             width: 160px;
             height: 40px;
@@ -49,9 +54,16 @@
             color: white;
             cursor: pointer;
         }
+
         button:hover {
             background-color: #3b91c7;
         }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
         .city-option {
             border: 1px solid #ccc;
             border-radius: 6px;
@@ -61,15 +73,21 @@
             justify-content: space-between;
             align-items: center;
         }
+
         .city-text {
             flex: 1;
             margin-right: 1rem;
             word-wrap: break-word;
         }
+
         .back-link {
             display: block;
             margin-top: 1.5rem;
             text-align: center;
+        }
+
+        .loading {
+            color: #666;
         }
     </style>
 </head>
@@ -90,49 +108,92 @@
 </div>
 
 <script>
-async function searchCity(city) {
-    const formData = new FormData();
-    formData.append("city", city);
+    async function searchCity(city) {
+        const formData = new FormData();
+        formData.append("city", city);
 
-    const res = await fetch("/api/search_city", { method: "POST", body: formData });
-    const data = await res.json();
+        const res = await fetch("/api/search_city", {method: "POST", body: formData});
+        const data = await res.json();
 
-    const container = document.getElementById("cities-container");
-    container.innerHTML = "";
+        const container = document.getElementById("cities-container");
+        container.innerHTML = "";
 
-    if (res.ok) {
-        data.results.forEach(c => {
-            const div = document.createElement("div");
-            div.className = "city-option";
+        if (res.ok) {
+            data.results.forEach(c => {
+                const div = document.createElement("div");
+                div.className = "city-option";
 
-            div.innerHTML = `
+                div.innerHTML = `
                 <span class="city-text">${c.address}</span>
-                <form action="/api/weather_data" method="post">
-                    <input type="hidden" name="lat" value="${c.lat}">
-                    <input type="hidden" name="lon" value="${c.lon}">
-                    <input type="hidden" name="user_city" value="${city}">
-                    <button type="submit">Скачать отчёт</button>
-                </form>
+                <button type="button" onclick="downloadReport(${c.lat}, ${c.lon}, '${city}', this)">
+                    Скачать отчёт
+                </button>
             `;
-            container.appendChild(div);
-        });
-    } else {
-        container.innerHTML = `<p style="color:red;">${data.error || "Город не найден"}</p>`;
+                container.appendChild(div);
+            });
+        } else {
+            container.innerHTML = `<p style="color:red;">${data.error || "Город не найден"}</p>`;
+        }
     }
-}
 
-document.getElementById("search-form").addEventListener("submit", e => {
-    e.preventDefault();
-    const city = document.getElementById("city-input").value;
-    searchCity(city);
-});
+    async function downloadReport(lat, lon, city, buttonElement) {
+        // Блокируем кнопку во время загрузки
+        buttonElement.disabled = true;
+        buttonElement.textContent = "Загрузка...";
 
-const urlParams = new URLSearchParams(window.location.search);
-const initialCity = urlParams.get("city");
-if (initialCity) {
-    document.getElementById("city-input").value = initialCity;
-    searchCity(initialCity);
-}
+        try {
+            const response = await fetch("/api/weather_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    lat: lat,
+                    lon: lon,
+                    user_city: city
+                })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Прогноз_${city}_${new Date().toISOString().split('T')[0]}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                buttonElement.textContent = "Скачать отчёт";
+            } else {
+                const errorData = await response.json();
+                alert(`Ошибка: ${errorData.detail || "Не удалось создать отчет"}`);
+                buttonElement.textContent = "Скачать отчёт";
+            }
+        } catch (error) {
+            console.error("Ошибка при скачивании:", error);
+            alert("Ошибка при скачивании отчета");
+            buttonElement.textContent = "Скачать отчёт";
+        } finally {
+            buttonElement.disabled = false;
+        }
+    }
+
+    document.getElementById("search-form").addEventListener("submit", e => {
+        e.preventDefault();
+        const city = document.getElementById("city-input").value;
+        searchCity(city);
+    });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialCity = urlParams.get("city");
+    if (initialCity) {
+        document.getElementById("city-input").value = initialCity;
+        searchCity(initialCity);
+    }
 </script>
 
 </body>
